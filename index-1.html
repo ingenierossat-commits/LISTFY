@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0ea5e9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Albo">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Albo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Plus Jakarta Sans', 'sans-serif'],
+          mono: ['DM Sans', 'sans-serif'],
+        },
+        colors: {
+          brand: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1' },
+          ink: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a' }
+        },
+        boxShadow: {
+          'card': '0 1px 3px rgba(15,23,42,0.08), 0 4px 16px rgba(15,23,42,0.06)',
+          'fab': '0 8px 32px rgba(14,165,233,0.35)',
+          'modal': '0 -4px 48px rgba(15,23,42,0.12)',
+        },
+        keyframes: {
+          slideUp: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
+          expand: { '0%': { opacity: '0', transform: 'translateY(-4px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        },
+        animation: {
+          'slide-up': 'slideUp 0.3s cubic-bezier(0.32,0.72,0,1)',
+          'expand': 'expand 0.2s ease',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body { background: #f8fafc; -webkit-tap-highlight-color: transparent; }
+  .screen { display: none; }
+  .screen.active { display: flex; }
+  .hidden-el { display: none !important; }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .albaran-actions { display: none; }
+  .albaran-row.expanded .albaran-actions { display: flex; animation: expand 0.2s ease; }
+  .albaran-row.expanded .chevron { transform: rotate(180deg); }
+  .chevron { transition: transform 0.2s ease; }
+  ::-webkit-scrollbar { width: 0px; }
+  .month-item { transition: all 0.15s; }
+  .month-item.sel-mode { cursor: pointer; }
+  .month-item.selected { border-color: #0ea5e9 !important; background: #f0f9ff !important; }
+  .sel-check { display: none; }
+  .month-item.selected .sel-check { display: flex; }
+  .month-item.selected .sel-empty { display: none; }
+</style>
+</head>
+<body class="font-sans text-ink-900 max-w-md mx-auto min-h-screen flex flex-col">
+
+<!-- ═══ SCREEN 1: AÑOS ═══ -->
+<div class="screen active flex-col min-h-screen" id="screen-years">
+  <div class="bg-white border-b border-ink-100 sticky top-0 z-10">
+    <div class="px-5 pt-12 pb-4 flex items-end justify-between">
+      <div>
+        <p class="text-xs font-semibold text-ink-400 uppercase tracking-widest mb-1">Panel de control</p>
+        <h1 class="text-2xl font-extrabold text-ink-900">Mis Albaranes</h1>
+      </div>
+      <button onclick="showYearModal()" class="bg-brand-500 active:bg-brand-700 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-1.5">
+        <span class="text-lg leading-none">+</span> Año
+      </button>
+    </div>
+  </div>
+  <div class="flex-1 overflow-y-auto px-4 py-4 pb-10 space-y-3" id="year-list"></div>
+  <div class="hidden-el text-center py-20 px-8" id="empty-years">
+    <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-4"><span class="text-3xl">📋</span></div>
+    <p class="font-semibold text-ink-500 text-sm leading-relaxed">Sin años creados.<br>Pulsa <span class="text-brand-500">+ Año</span> para empezar.</p>
+  </div>
+</div>
+
+<!-- ═══ SCREEN 2: MESES ═══ -->
+<div class="screen flex-col min-h-screen" id="screen-months">
+  <!-- Topbar normal -->
+  <div id="topbar-normal" class="bg-white border-b border-ink-100 sticky top-0 z-10">
+    <div class="px-4 pt-12 pb-4 flex items-center gap-3">
+      <button onclick="goTo('years')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-ink-100 active:bg-ink-200">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="flex-1">
+        <p class="text-xs text-ink-400 font-semibold uppercase tracking-widest">Año</p>
+        <h2 class="text-xl font-extrabold" id="tb-year">2025</h2>
+      </div>
+      <button onclick="startInforme()" class="bg-ink-800 active:bg-ink-900 text-white font-bold text-xs px-3 py-2.5 rounded-xl flex items-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Informe
+      </button>
+    </div>
+  </div>
+  <!-- Topbar modo informe -->
+  <div id="topbar-informe" class="hidden-el bg-ink-900 sticky top-0 z-10">
+    <div class="px-4 pt-12 pb-4 flex items-center gap-3">
+      <div class="flex-1">
+        <p class="text-xs text-brand-300 font-semibold uppercase tracking-widest mb-0.5">Modo informe</p>
+        <h2 class="text-lg font-extrabold text-white" id="tb-year-informe">2025</h2>
+      </div>
+      <span id="sel-count-badge" class="bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded-full">0 meses</span>
+      <button onclick="cancelInforme()" class="bg-white/10 text-white font-bold text-xs px-3 py-2.5 rounded-xl">
+        Cancelar
+      </button>
+    </div>
+    <div class="px-4 pb-3">
+      <p class="text-ink-400 text-xs font-medium">Toca los meses que quieres incluir en el informe</p>
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-y-auto px-4 py-4 pb-36">
+    <div id="year-summary-card" class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl p-5 mb-5 shadow-card">
+      <p class="text-brand-100 text-xs font-semibold uppercase tracking-widest mb-1">Total facturado</p>
+      <p class="text-white text-3xl font-extrabold font-mono tracking-tight" id="year-total-display">0,00 €</p>
+    </div>
+    <div class="space-y-2.5" id="months-list"></div>
+  </div>
+
+  <!-- FAB generar PDF (solo en modo informe) -->
+  <div id="fab-pdf" class="hidden-el fixed bottom-0 left-0 right-0 max-w-md mx-auto px-4 pb-8 pt-4 bg-gradient-to-t from-slate-900 to-transparent">
+    <button onclick="generarPDF()" class="w-full bg-ink-800 active:bg-ink-900 text-white font-bold text-base py-4 rounded-2xl flex items-center justify-center gap-2" style="box-shadow:0 8px 32px rgba(15,23,42,0.4)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Generar informe PDF
+    </button>
+  </div>
+</div>
+
+<!-- ═══ SCREEN 3: MES DETALLE ═══ -->
+<div class="screen flex-col min-h-screen" id="screen-detail">
+  <div class="bg-white border-b border-ink-100 sticky top-0 z-10">
+    <div class="px-4 pt-12 pb-4 flex items-center gap-3">
+      <button onclick="goTo('months')" class="w-9 h-9 flex items-center justify-center rounded-xl bg-ink-100 active:bg-ink-200">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="flex-1">
+        <p class="text-xs text-ink-400 font-semibold uppercase tracking-widest">Albaranes</p>
+        <h2 class="text-xl font-extrabold" id="tb-month">Enero 2025</h2>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 overflow-y-auto px-4 py-4 pb-32">
+    <div class="bg-white rounded-2xl p-4 mb-4 shadow-card border border-ink-100 flex items-center justify-between">
+      <div>
+        <p class="text-xs text-ink-400 font-semibold uppercase tracking-widest mb-0.5">Total del mes</p>
+        <p class="text-2xl font-extrabold font-mono text-brand-600" id="month-total-display">0,00 €</p>
+      </div>
+      <div class="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+      </div>
+    </div>
+    <div id="albaranes-list" class="space-y-2"></div>
+    <div class="hidden-el text-center py-16 px-8" id="empty-albaranes">
+      <div class="w-14 h-14 bg-ink-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><span class="text-2xl">🗒️</span></div>
+      <p class="text-ink-400 text-sm font-medium leading-relaxed">Sin albaranes este mes.<br>Pulsa el botón para añadir.</p>
+    </div>
+  </div>
+  <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto px-4 pb-8 pt-4 bg-gradient-to-t from-ink-50 to-transparent">
+    <button onclick="showAlbaranModal(null)" class="w-full bg-brand-500 active:bg-brand-700 text-white font-bold text-base py-4 rounded-2xl shadow-fab flex items-center justify-center gap-2">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Nuevo albarán
+    </button>
+  </div>
+</div>
+
+<!-- MODAL AÑO -->
+<div class="fixed inset-0 z-50 flex items-end justify-center hidden-el" id="modal-year">
+  <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onclick="closeModal('modal-year')"></div>
+  <div class="relative bg-white rounded-t-3xl w-full max-w-md p-6 pb-10 shadow-modal animate-slide-up">
+    <div class="w-10 h-1 bg-ink-200 rounded-full mx-auto mb-6"></div>
+    <h2 class="text-xl font-extrabold mb-5">Nuevo año</h2>
+    <div class="mb-4">
+      <label class="block text-xs font-bold text-ink-500 uppercase tracking-wider mb-2">Año</label>
+      <input type="number" id="input-year" inputmode="numeric" placeholder="2025"
+        class="w-full bg-ink-50 border border-ink-200 rounded-xl px-4 py-3.5 text-base font-mono font-medium focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-all">
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeModal('modal-year')" class="flex-1 bg-ink-100 text-ink-600 font-bold py-3.5 rounded-xl">Cancelar</button>
+      <button onclick="addYear()" class="flex-1 bg-brand-500 text-white font-bold py-3.5 rounded-xl shadow-sm">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ALBARÁN -->
+<div class="fixed inset-0 z-50 flex items-end justify-center hidden-el" id="modal-albaran">
+  <div class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onclick="closeModal('modal-albaran')"></div>
+  <div class="relative bg-white rounded-t-3xl w-full max-w-md p-6 pb-10 shadow-modal animate-slide-up">
+    <div class="w-10 h-1 bg-ink-200 rounded-full mx-auto mb-6"></div>
+    <h2 class="text-xl font-extrabold mb-5" id="modal-alb-title">Nuevo albarán</h2>
+    <div class="mb-4">
+      <label class="block text-xs font-bold text-ink-500 uppercase tracking-wider mb-2">Número de albarán</label>
+      <input type="text" id="input-num" placeholder="ALB-0001"
+        class="w-full bg-ink-50 border border-ink-200 rounded-xl px-4 py-3.5 text-base font-mono font-medium focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-all">
+    </div>
+    <div class="mb-4">
+      <label class="block text-xs font-bold text-ink-500 uppercase tracking-wider mb-2">Importe (€)</label>
+      <div class="relative">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 font-bold">€</span>
+        <input type="number" id="input-importe" inputmode="decimal" placeholder="0,00" step="0.01" min="0"
+          class="w-full bg-ink-50 border border-ink-200 rounded-xl pl-9 pr-4 py-3.5 text-base font-mono font-medium focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition-all">
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeModal('modal-albaran')" class="flex-1 bg-ink-100 text-ink-600 font-bold py-3.5 rounded-xl">Cancelar</button>
+      <button onclick="saveAlbaran()" class="flex-1 bg-brand-500 text-white font-bold py-3.5 rounded-xl shadow-sm">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let data = JSON.parse(localStorage.getItem('albo_data') || '{}');
+let currentYear=null, currentMonth=null, editingId=null, expandedId=null, confirmingId=null;
+let informeMode=false, selectedMonths=new Set();
+
+function save() { localStorage.setItem('albo_data', JSON.stringify(data)); }
+function fmt(v) { return Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20AC'; }
+function yearTotal(y) { return Object.values(data[y]||{}).flat().reduce((s,a)=>s+(parseFloat(a.importe)||0),0); }
+function monthTotal(y,m) { return ((data[y]||{})[m]||[]).reduce((s,a)=>s+(parseFloat(a.importe)||0),0); }
+function getAlbs(y,m) { return ((data[y]||{})[m]||[]); }
+
+function goTo(s) {
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+  document.getElementById('screen-'+s).classList.add('active');
+  window.scrollTo(0,0); expandedId=null; confirmingId=null;
+}
+
+/* ══ AÑOS ══ */
+function renderYears() {
+  const list=document.getElementById('year-list'), empty=document.getElementById('empty-years');
+  const years=Object.keys(data).sort((a,b)=>+b-+a);
+  list.innerHTML='';
+  if (!years.length){empty.classList.remove('hidden-el');return;}
+  empty.classList.add('hidden-el');
+  years.forEach(y=>{
+    const total=yearTotal(y), count=Object.values(data[y]||{}).flat().length;
+    const div=document.createElement('div');
+    div.className='bg-white rounded-2xl p-4 shadow-card border border-ink-100 flex items-center gap-4 cursor-pointer active:bg-ink-50 relative';
+    div.innerHTML=`
+      <div class="w-14 h-14 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
+        <span class="text-brand-600 font-extrabold text-xl">${y.slice(2)}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="font-extrabold text-lg text-ink-900">${y}</div>
+        <p class="font-bold text-base font-mono text-ink-800">${fmt(total)}</p>
+        <p class="text-xs text-ink-400 font-medium mt-0.5">${count} albar\u00e1n${count!==1?'es':''}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="w-8 h-8 flex items-center justify-center rounded-lg text-ink-300 active:text-red-400" data-del="${y}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <svg class="text-ink-300" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>`;
+    div.querySelector('[data-del]').addEventListener('click',e=>{e.stopPropagation();deleteYear(y);});
+    div.addEventListener('click',()=>openYear(y));
+    list.appendChild(div);
+  });
+}
+
+function showYearModal() {
+  document.getElementById('input-year').value=new Date().getFullYear();
+  document.getElementById('modal-year').classList.remove('hidden-el');
+  setTimeout(()=>document.getElementById('input-year').focus(),200);
+}
+function addYear() {
+  const y=document.getElementById('input-year').value.trim();
+  if (!y||isNaN(y)||y.length!==4){alert('Introduce un año válido (4 dígitos)');return;}
+  if (data[y]){alert('Ese año ya existe');return;}
+  data[y]={}; save(); closeModal('modal-year'); renderYears();
+}
+function deleteYear(y) {
+  if (!confirm('¿Eliminar el año '+y+'?')) return;
+  delete data[y]; save(); renderYears();
+}
+
+/* ══ MESES ══ */
+function openYear(y) {
+  currentYear=y;
+  document.getElementById('tb-year').textContent=y;
+  document.getElementById('tb-year-informe').textContent=y;
+  cancelInforme();
+  renderMonths(); goTo('months');
+}
+
+function renderMonths() {
+  document.getElementById('year-total-display').textContent=fmt(yearTotal(currentYear));
+  const list=document.getElementById('months-list');
+  list.innerHTML='';
+  for (let m=0;m<12;m++) {
+    const total=monthTotal(currentYear,m), count=getAlbs(currentYear,m).length, hasData=total>0;
+    const isSelected=selectedMonths.has(m);
+    const div=document.createElement('div');
+    div.className=`month-item bg-white rounded-2xl px-4 py-3.5 shadow-card border ${isSelected?'border-brand-500 bg-brand-50':hasData?'border-brand-100':'border-ink-100'} flex items-center gap-3 cursor-pointer active:bg-ink-50${informeMode?' sel-mode':''}${isSelected?' selected':''}`;
+    div.dataset.month=m;
+    div.innerHTML=`
+      <div class="w-10 h-10 ${hasData?'bg-brand-50':'bg-ink-50'} rounded-xl flex items-center justify-center shrink-0 relative">
+        <span class="font-bold text-sm ${hasData?'text-brand-500':'text-ink-400'} ${isSelected?'hidden':''}">${String(m+1).padStart(2,'0')}</span>
+        <div class="sel-check w-10 h-10 bg-brand-500 rounded-xl items-center justify-center ${isSelected?'flex':'hidden'}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="flex-1">
+        <p class="font-bold text-ink-900 text-sm">${MONTHS[m]}</p>
+        <p class="text-xs ${hasData?'text-ink-500':'text-ink-300'} font-medium mt-0.5">${count} albar\u00e1n${count!==1?'es':''}</p>
+      </div>
+      <p class="font-bold font-mono text-sm ${hasData?'text-brand-600':'text-ink-300'}">${fmt(total)}</p>
+      <svg class="${informeMode?'hidden':''} text-ink-300 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+
+    if (informeMode) {
+      div.addEventListener('click',()=>toggleMonthSelection(m));
+    } else {
+      div.addEventListener('click',()=>openMonth(m));
+    }
+    list.appendChild(div);
+  }
+}
+
+/* ══ MODO INFORME ══ */
+function startInforme() {
+  informeMode=true; selectedMonths.clear();
+  document.getElementById('topbar-normal').classList.add('hidden-el');
+  document.getElementById('topbar-informe').classList.remove('hidden-el');
+  document.getElementById('fab-pdf').classList.remove('hidden-el');
+  document.getElementById('year-summary-card').classList.add('hidden-el');
+  updateSelCount();
+  renderMonths();
+}
+
+function cancelInforme() {
+  informeMode=false; selectedMonths.clear();
+  document.getElementById('topbar-normal').classList.remove('hidden-el');
+  document.getElementById('topbar-informe').classList.add('hidden-el');
+  document.getElementById('fab-pdf').classList.add('hidden-el');
+  document.getElementById('year-summary-card').classList.remove('hidden-el');
+  renderMonths();
+}
+
+function toggleMonthSelection(m) {
+  if (selectedMonths.has(m)) selectedMonths.delete(m);
+  else selectedMonths.add(m);
+  updateSelCount();
+  renderMonths();
+}
+
+function updateSelCount() {
+  const n=selectedMonths.size;
+  document.getElementById('sel-count-badge').textContent=n+' mes'+(n!==1?'es':'');
+}
+
+/* ══ GENERAR PDF ══ */
+function generarPDF() {
+  if (selectedMonths.size===0){alert('Selecciona al menos un mes');return;}
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W=210, margin=18, colRight=W-margin;
+
+  // Colores
+  const BLUE=[14,165,233], DARK=[15,23,42], GRAY=[100,116,139], LIGHT=[241,245,249], MID=[203,213,225];
+
+  let y=0;
+
+  // ── CABECERA ──
+  doc.setFillColor(...BLUE);
+  doc.rect(0,0,W,38,`F`);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(22); doc.setFont('helvetica','bold');
+  doc.text('INFORME DE ALBARANES', margin, 18);
+  doc.setFontSize(11); doc.setFont('helvetica','normal');
+  doc.setTextColor(186,230,253);
+  doc.text('Año '+currentYear, margin, 27);
+  const today=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+  doc.text('Generado: '+today, colRight, 27, {align:'right'});
+  y=48;
+
+  // Ordenar meses seleccionados
+  const meses=[...selectedMonths].sort((a,b)=>a-b);
+
+  meses.forEach((m,idx)=>{
+    const albs=getAlbs(currentYear,m);
+    const total=monthTotal(currentYear,m);
+    const blockH=14+(albs.length>0?albs.length*9+4:10)+10;
+
+    // Nueva página si no cabe
+    if (y+blockH>275) { doc.addPage(); y=20; }
+
+    // ── CABECERA MES ──
+    doc.setFillColor(...LIGHT);
+    doc.roundedRect(margin,y,W-margin*2,12,3,3,'F');
+    doc.setTextColor(...DARK);
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text(MONTHS[m].toUpperCase()+' '+currentYear, margin+5, y+8);
+    doc.setTextColor(...BLUE);
+    doc.text(fmt(total), colRight-5, y+8, {align:'right'});
+    y+=16;
+
+    if (albs.length===0) {
+      doc.setTextColor(...GRAY);
+      doc.setFontSize(9); doc.setFont('helvetica','italic');
+      doc.text('Sin albaranes este mes', margin+5, y+5);
+      y+=12;
+    } else {
+      // Cabecera tabla
+      doc.setFillColor(...MID);
+      doc.rect(margin,y,W-margin*2,7,'F');
+      doc.setTextColor(...DARK);
+      doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text('Nº', margin+4, y+5);
+      doc.text('ALBARÁN', margin+14, y+5);
+      doc.text('IMPORTE', colRight-5, y+5, {align:'right'});
+      y+=7;
+
+      // Filas
+      albs.forEach((a,i)=>{
+        if (y>275){doc.addPage();y=20;}
+        const bg=i%2===0?[255,255,255]:[248,250,252];
+        doc.setFillColor(...bg);
+        doc.rect(margin,y,W-margin*2,9,'F');
+        doc.setTextColor(...GRAY);
+        doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(String(i+1), margin+4, y+6);
+        doc.setTextColor(...DARK);
+        doc.setFont('helvetica','bold');
+        doc.text(a.num, margin+14, y+6);
+        doc.setTextColor(5,150,105);
+        doc.text(fmt(a.importe), colRight-5, y+6, {align:'right'});
+        y+=9;
+      });
+
+      // Línea total mes
+      doc.setDrawColor(...MID);
+      doc.setLineWidth(0.3);
+      doc.line(margin,y,colRight,y);
+      y+=4;
+      doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.setTextColor(...DARK);
+      doc.text('Total '+MONTHS[m], margin+4, y+5);
+      doc.setTextColor(...BLUE);
+      doc.text(fmt(total), colRight-5, y+5, {align:'right'});
+      y+=12;
+    }
+
+    y+=4; // espacio entre meses
+  });
+
+  // ── TOTAL GENERAL ──
+  if (y+20>275){doc.addPage();y=20;}
+  y+=4;
+  doc.setFillColor(...DARK);
+  doc.roundedRect(margin,y,W-margin*2,16,3,3,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text('TOTAL GENERAL', margin+6, y+10);
+  const totalGeneral=meses.reduce((s,m)=>s+monthTotal(currentYear,m),0);
+  doc.setTextColor(...[232,255,71]); // accent amarillo
+  doc.text(fmt(totalGeneral), colRight-6, y+10, {align:'right'});
+
+  // Pie de página en todas las páginas
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.setTextColor(...GRAY);
+    doc.text('Albo · Gestión de Albaranes', margin, 292);
+    doc.text('Pág. '+p+' / '+pages, colRight, 292, {align:'right'});
+  }
+
+  doc.save('Informe_'+currentYear+'_Albo.pdf');
+  cancelInforme();
+}
+
+/* ══ DETALLE MES ══ */
+function openMonth(m) {
+  currentMonth=m;
+  document.getElementById('tb-month').textContent=MONTHS[m]+' '+currentYear;
+  renderDetail(); goTo('detail');
+}
+
+function renderDetail() {
+  document.getElementById('month-total-display').textContent=fmt(monthTotal(currentYear,currentMonth));
+  const list=document.getElementById('albaranes-list'), empty=document.getElementById('empty-albaranes');
+  const albs=getAlbs(currentYear,currentMonth);
+  list.innerHTML='';
+  if (!albs.length){empty.classList.remove('hidden-el');return;}
+  empty.classList.add('hidden-el');
+  albs.forEach((a,i)=>{
+    const isExpanded=expandedId===a.id, isConfirming=confirmingId===a.id;
+    const div=document.createElement('div');
+    div.className=`albaran-row bg-white rounded-2xl shadow-card border border-ink-100 overflow-hidden${isExpanded?' expanded':''}`;
+    const actionsHTML=isConfirming
+      ?`<div class="albaran-actions flex gap-2 px-4 pb-3 border-t border-ink-100 pt-3">
+          <button data-action="cancel" class="flex-1 bg-ink-100 text-ink-600 font-bold text-sm py-3 rounded-xl">Cancelar</button>
+          <button data-action="confirm" data-id="${a.id}" class="flex-1 bg-red-500 text-white font-bold text-sm py-3 rounded-xl">Confirmar borrado</button>
+        </div>`
+      :`<div class="albaran-actions flex gap-2 px-4 pb-3 border-t border-ink-100 pt-3">
+          <button data-action="edit" data-id="${a.id}" class="flex-1 bg-brand-50 text-brand-600 font-bold text-sm py-3 rounded-xl border border-brand-100">Editar</button>
+          <button data-action="askdel" data-id="${a.id}" class="flex-1 bg-red-50 text-red-500 font-bold text-sm py-3 rounded-xl border border-red-100">Borrar</button>
+        </div>`;
+    div.innerHTML=`
+      <div class="albaran-row-main flex items-center gap-3 px-4 py-3.5 cursor-pointer">
+        <div class="w-7 h-7 bg-ink-100 rounded-lg flex items-center justify-center shrink-0">
+          <span class="font-bold text-xs text-ink-400">${i+1}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold font-mono text-sm text-ink-900 truncate">${a.num}</p>
+        </div>
+        <p class="font-bold font-mono text-base text-emerald-600 shrink-0">${fmt(a.importe)}</p>
+        <svg class="chevron text-ink-300 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>${actionsHTML}`;
+    div.querySelector('.albaran-row-main').addEventListener('click',()=>toggleRow(a.id));
+    div.querySelectorAll('[data-action]').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const action=btn.dataset.action, id=btn.dataset.id;
+        if (action==='edit') showAlbaranModal(id);
+        else if (action==='askdel'){confirmingId=id;renderDetail();}
+        else if (action==='confirm') deleteAlbaran(id);
+        else if (action==='cancel'){confirmingId=null;renderDetail();}
+      });
+    });
+    list.appendChild(div);
+  });
+}
+
+function toggleRow(id){expandedId=expandedId===id?null:id;confirmingId=null;renderDetail();}
+function deleteAlbaran(id){
+  data[currentYear][currentMonth]=getAlbs(currentYear,currentMonth).filter(a=>a.id!==id);
+  expandedId=null;confirmingId=null;save();renderDetail();renderMonths();
+}
+
+function showAlbaranModal(id){
+  editingId=id;
+  if (id){
+    const a=getAlbs(currentYear,currentMonth).find(x=>x.id===id);
+    document.getElementById('modal-alb-title').textContent='Editar albarán';
+    document.getElementById('input-num').value=a.num;
+    document.getElementById('input-importe').value=a.importe;
+  } else {
+    document.getElementById('modal-alb-title').textContent='Nuevo albarán';
+    document.getElementById('input-num').value='';
+    document.getElementById('input-importe').value='';
+  }
+  document.getElementById('modal-albaran').classList.remove('hidden-el');
+  setTimeout(()=>document.getElementById('input-num').focus(),200);
+}
+
+function saveAlbaran(){
+  const num=document.getElementById('input-num').value.trim();
+  const importe=parseFloat(document.getElementById('input-importe').value);
+  if (!num){alert('Introduce el número de albarán');return;}
+  if (isNaN(importe)||importe<0){alert('Introduce un importe válido');return;}
+  if (!data[currentYear]) data[currentYear]={};
+  if (!data[currentYear][currentMonth]) data[currentYear][currentMonth]=[];
+  if (editingId){
+    const idx=data[currentYear][currentMonth].findIndex(a=>a.id===editingId);
+    if (idx>-1) data[currentYear][currentMonth][idx]={id:editingId,num,importe};
+  } else {
+    const id=Date.now().toString(36)+Math.random().toString(36).slice(2);
+    data[currentYear][currentMonth].push({id,num,importe});
+  }
+  expandedId=null;confirmingId=null;save();closeModal('modal-albaran');renderDetail();renderMonths();
+}
+
+function closeModal(id){document.getElementById(id).classList.add('hidden-el');}
+
+document.getElementById('input-year').addEventListener('keydown',e=>{if(e.key==='Enter')addYear();});
+document.getElementById('input-num').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('input-importe').focus();});
+document.getElementById('input-importe').addEventListener('keydown',e=>{if(e.key==='Enter')saveAlbaran();});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+renderYears();
+</script>
+</body>
+</html>
